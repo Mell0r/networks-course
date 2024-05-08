@@ -1,7 +1,6 @@
-import { Controller, Get, HttpException, Param, Res } from '@nestjs/common';
+import { Controller, Get, HttpException, Param } from '@nestjs/common';
 import { AppService } from './app.service';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { Worker } from 'node:worker_threads';
 
 @Controller()
 export class AppController {
@@ -9,12 +8,20 @@ export class AppController {
 
   @Get(':filename')
   async getContent(@Param('filename') filename: string): Promise<string> {
-    console.log(`get file request on path: ${resolve('')}`);
-    return readFile(`./resources/${filename}`, { encoding: 'utf8' }).catch(
-      (err) => {
-        console.error(err.toString());
-        throw new HttpException('File not found', 404);
-      },
-    );
+    console.log(`get file request with name: ${filename}`);
+
+    const resultPromise: Promise<string> = new Promise((resolve, reject) => {
+      const worker = new Worker('./src/worker/worker.ts', {
+        workerData: { filename: filename },
+      });
+      worker.on('message', (fileContent) => {
+        resolve(fileContent);
+      });
+      worker.on('error', (err) => reject(err));
+    });
+
+    return resultPromise.catch((err) => {
+      throw new HttpException('File not found', 404);
+    });
   }
 }
