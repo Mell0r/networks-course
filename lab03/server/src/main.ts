@@ -17,7 +17,7 @@ app.get("/:filename", (req: Request, res: Response) => {
   while (threadCount === 0) {}
   threadCount--;
   const resultPromise: Promise<string> = new Promise((resolve, reject) => {
-    const worker = new Worker("./src/worker/worker.ts", {
+    const worker = new Worker("./src/worker.ts", {
       workerData: { filename: req.params.filename },
     });
     worker.on("message", (fileContent) => resolve(fileContent));

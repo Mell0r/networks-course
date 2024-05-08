@@ -6,7 +6,4 @@ function readResource(filename: string): string {
   return readFileSync(`./resources/${filename}`, { encoding: "utf8" });
 }
 
-console.log("a");
-while (true) {};
-
 parentPort!.postMessage(readResource(workerData.filename));
