@@ -4,6 +4,7 @@
 __pycache__/
 bin/
 build/
+node_modules/
 dist/
 lib/
 lib64/

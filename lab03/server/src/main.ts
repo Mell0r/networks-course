@@ -11,6 +11,4 @@ if (process.argv.length === 2) {
   process.exit(1);
 }
 
-console.log(__dirname);
-
 bootstrap(parseInt(process.argv[2]));
