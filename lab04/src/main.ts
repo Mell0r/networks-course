@@ -53,7 +53,6 @@ function handlePath(method: "GET" | "POST") {
           }
         : undefined;
     let body = method === "POST" ? request.body : undefined;
-    console.log(request.body);
     const fetchPromise = fetch(`http://${url}`, {
       method: method,
       headers: headers,
