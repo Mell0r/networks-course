@@ -1,6 +1,8 @@
 .idea/
 .idea_modules/
 node_modules/
+test_files/
+ruff.toml
 .vscode/
 __pycache__/
 bin/
