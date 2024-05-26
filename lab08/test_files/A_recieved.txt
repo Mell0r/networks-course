@@ -1,0 +1,64 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <map>
+#include <set>
+
+using namespace std;
+
+const int SZ = 3e5;
+
+bool used[SZ];
+vector<int> g[SZ];
+
+void dfs(int pos, vector<int>& comp) {
+    comp.push_back(pos);
+    used[pos] = 1;
+    for (int to : g[pos])
+        if (!used[to])
+            dfs(to, comp);
+}
+
+int main()
+{
+    int n, m;
+    cin >> n >> m;
+    vector<vector<char>> mtx(n, vector<char>(m));
+    for (int r = 0; r < n; r++)
+        for (int c = 0; c < m; c++) {
+            cin >> mtx[r][c];
+            if (mtx[r][c] == '#')
+                continue;
+
+            if (r > 0 && mtx[r - 1][c] != '#') {
+                g[r * m + c].push_back((r - 1) * m + c);
+                g[(r - 1) * m + c].push_back(r * m + c);
+            }
+            if (c > 0 && mtx[r][c - 1] != '#') {
+                g[r * m + c].push_back(r * m + c - 1);
+                g[r * m + c - 1].push_back(r * m + c);
+            }
+        }
+
+    vector<vector<int>> ans(n, vector<int>(m));
+    for (int v = 0; v < n * m; v++) {
+        if (used[v])
+            continue;
+
+        vector<int> comp;
+        dfs(v, comp);
+
+        int carrots = 0;
+        for (int u : comp)
+            carrots += mtx[u / m][u % m] == 'C';
+
+        for (int u : comp)
+            if (mtx[u / m][u % m] == 'R')
+                ans[u / m][u % m] = carrots;
+    }
+
+    for (int r = 0; r < n; r++)
+        for (int c = 0; c < m; c++)
+            if (mtx[r][c] == 'R')
+                cout << ans[r][c] << ' ';
+}
