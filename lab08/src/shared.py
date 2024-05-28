@@ -29,6 +29,9 @@ def recieve_file(socket: sck.socket, file_path: str) -> Address | None:
                 print(data["data"])
                 break
 
+            if not verify_checksum(bytes(data["data"]), data["checksum"]):
+                continue
+
             if (
                 last_accepted_package_number is None
                 or last_accepted_package_number != data["package_number"]
@@ -75,21 +78,13 @@ def send_file(
                     {
                         "package_number": package_number,
                         "data": chunk,
+                        "checksum": calculate_checksum(bytes(chunk)),
                     }
                 )
 
                 print(f"Sending package number: {package_number}")
+                send_with_chance(socket, data_encoded, address_to)
 
-                send_with_chance(
-                    socket,
-                    pickle.dumps(
-                        {
-                            "package_number": package_number,
-                            "data": chunk,
-                        }
-                    ),
-                    address_to,
-                )
                 try:
                     data_encoded, _ = socket.recvfrom(1024)
                     data = pickle.loads(data_encoded)
@@ -126,5 +121,5 @@ def calculate_checksum(data: bytes, k=16):
     )
 
 
-def verify_checksum(data, checksum: int, k: int = 16):
+def verify_checksum(data: bytes, checksum: int, k: int = 16):
     return (~calculate_checksum(data, k) & 0xFFFF) + checksum == 0xFFFF
