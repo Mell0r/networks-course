@@ -1,0 +1,62 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <map>
+#include <set>
+#include <random>
+#include <ctime>
+
+using namespace std;
+
+const int SZ = 3e5;
+
+int p[SZ];
+
+int get_root(int v) {
+    if (p[v] != -1)
+        return p[v] = get_root(p[v]);
+    return v;
+}
+
+void join(int v1, int v2) {
+    v1 = get_root(v1);
+    v2 = get_root(v2);
+    if (rand() % 2)
+        p[v1] = v2;
+    else
+        p[v2] = v1;
+}
+
+int main()
+{
+    srand(time(0) + clock());
+    int n, m;
+    cin >> n >> m;
+    for (int i = 1; i <= n; i++)
+        p[i] = -1;
+
+    vector<pair<int, int>> ans;
+    for (int i = 0; i < m; i++) {
+        int v1, v2;
+        cin >> v1 >> v2;
+        if (get_root(v1) != get_root(v2))
+            join(v1, v2);
+        else
+            ans.emplace_back(v1, v2);
+    }
+    int prev = -1;
+    for (int i = 1; i <= n; i++) {
+        if (p[i] != -1)
+            continue;
+
+        if (prev != -1) {
+            ans.emplace_back(prev, i);
+            join(prev, i);
+        }
+        prev = i;
+    }
+
+    cout << ans.size() << '\n';
+    for (pair<int, int> &e : ans)
+        cout << e.first << ' ' << e.second << '\n';
+}
