@@ -2,6 +2,7 @@ from random import random
 import pickle
 import socket as sck
 from itertools import batched
+from functools import reduce
 from collections.abc import Buffer
 
 type Address = tuple[str, int]
@@ -112,3 +113,18 @@ def send_file(
         )
         print(error)
     socket.settimeout(None)
+
+
+def calculate_checksum(data: bytes, k=16):
+    return (
+        ~reduce(
+            lambda prev, new: (prev + int.from_bytes(new)) & 0xFFFF,
+            batched(data, k),
+            0,
+        )
+        & 0xFFFF
+    )
+
+
+def verify_checksum(data, checksum: int, k: int = 16):
+    return (~calculate_checksum(data, k) & 0xFFFF) + checksum == 0xFFFF
