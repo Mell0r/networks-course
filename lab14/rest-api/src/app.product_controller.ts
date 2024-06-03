@@ -5,15 +5,44 @@ import {
   Get,
   HttpException,
   HttpStatus,
+  Ip,
   Param,
   Post,
   Put,
 } from '@nestjs/common';
 import { Product, ProductData, createProduct } from './product';
-import { checkAuthorization } from './app.user_controller';
+import { checkAuthorization, emailByIp } from './app.user_controller';
+import { sendGreetings } from './mail';
 
 let publicProducts: Product[] = [];
 let usersProducts = new Map<string, Product[]>();
+function mapUsersProducts(user: string, func: (prod: Product) => Product) {
+  usersProducts.set(user, (usersProducts.get(user) ?? []).map(func));
+}
+function pushUsersProducts(user: string, product: Product) {
+  usersProducts.set(user, usersProducts.get(user) ?? []);
+  usersProducts.get(user)!!.push(product);
+}
+
+let timeouts = new Map<string, NodeJS.Timeout>();
+function setEmailTimeout(token: string | undefined, ip: string | undefined) {
+  if (!token && ip) {
+    const email = emailByIp.get(ip);
+    console.log(`Saved email: ${email}`);
+    if (email) {
+      if (timeouts.has(email)) {
+        clearTimeout(timeouts.get(email)!!);
+      }
+      timeouts.set(
+        email,
+        setTimeout(() => {
+          sendGreetings(email);
+          timeouts.delete(email);
+        }, 60000),
+      );
+    }
+  }
+}
 
 @Controller('/product')
 export class ProductController {
@@ -26,7 +55,8 @@ export class ProductController {
   ): Product {
     const product = createProduct(productData);
     const maybeUser = checkAuthorization(token);
-    if (maybeUser) usersProducts[maybeUser].push(product);
+
+    if (maybeUser) pushUsersProducts(maybeUser, product);
     else publicProducts.push(product);
     return product;
   }
@@ -35,9 +65,13 @@ export class ProductController {
   getProduct(
     @Param('id') id: number,
     @Param('token') token: string | undefined,
+    @Ip() ip: string | undefined,
   ): Product {
+    setEmailTimeout(token, ip);
+
+    const maybeUser = checkAuthorization(token);
     const availableProducts = publicProducts.concat(
-      token ? usersProducts.get(token) ?? [] : [],
+      maybeUser ? usersProducts.get(maybeUser) ?? [] : [],
     );
     const product = availableProducts.find((value) => value.id == id);
     if (!product) {
@@ -56,29 +90,20 @@ export class ProductController {
     @Body() newData: Partial<Product>,
   ): Product {
     let changedProduct: Product | undefined = undefined;
-
-    publicProducts = publicProducts.map((value) => {
+    const modifyProducts = (value: Product) => {
       if (value.id == id) {
         changedProduct = { ...value, ...newData };
         return changedProduct;
       } else {
         return value;
       }
-    });
+    };
+
+    publicProducts = publicProducts.map(modifyProducts);
 
     const maybeUser = checkAuthorization(token);
     if (maybeUser) {
-      if (!usersProducts.has(maybeUser)) {
-        usersProducts.set(maybeUser, []);
-      }
-      usersProducts.get(maybeUser)!!.map((value) => {
-        if (value.id == id) {
-          changedProduct = { ...value, ...newData };
-          return changedProduct;
-        } else {
-          return value;
-        }
-      });
+      mapUsersProducts(maybeUser, modifyProducts);
     }
 
     if (!changedProduct) {
@@ -98,15 +123,12 @@ export class ProductController {
     let product: Product | undefined = undefined;
 
     product = publicProducts.find((value) => value.id == id);
-    publicProducts = publicProducts.filter((value) => value.id == id);
+    publicProducts = publicProducts.filter((value) => value.id != id);
 
     const maybeUser = checkAuthorization(token);
     if (maybeUser && usersProducts.has(maybeUser)) {
       product = usersProducts.get(maybeUser)!!.find((value) => value.id == id);
-      usersProducts.set(
-        maybeUser,
-        usersProducts.get(maybeUser)!!.filter((value) => value.id == id),
-      );
+      usersProducts.get(maybeUser)!!.filter((value) => value.id != id);
     }
 
     if (!product) {
@@ -124,7 +146,11 @@ export class ProductListController {
   constructor() {}
 
   @Get(':token?')
-  getList(@Param('token') token: string | undefined): Product[] {
+  getList(
+    @Param('token') token: string | undefined,
+    @Ip() ip: string | undefined,
+  ): Product[] {
+    setEmailTimeout(token, ip);
     return publicProducts.concat(token ? usersProducts.get(token) ?? [] : []);
   }
 }

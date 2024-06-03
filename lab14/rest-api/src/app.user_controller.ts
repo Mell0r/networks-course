@@ -4,6 +4,7 @@ import {
   Post,
   HttpException,
   HttpStatus,
+  Ip,
 } from '@nestjs/common';
 import { SessionToken, UserData } from './user';
 
@@ -21,7 +22,8 @@ function generateRandomString(length: number): string {
 }
 
 let passwords = new Map<string, string>();
-export let tokens = new Map<string, string>();
+let tokens = new Map<string, string>();
+export let emailByIp = new Map<string, string>();
 
 export function checkAuthorization(
   token: string | undefined,
@@ -36,13 +38,12 @@ export class UserController {
   constructor() {}
 
   @Post('sign-up')
-  signUp(@Body() userData: UserData): SessionToken {
-    if (passwords.has(userData.email)) {
-      throw new HttpException(
-        'User with this email already exisis',
-        HttpStatus.BAD_REQUEST,
-      );
-    }
+  signUp(
+    @Body() userData: UserData,
+    @Ip() ip: string | undefined,
+  ): SessionToken {
+    if (ip) emailByIp.set(ip, userData.email);
+
     passwords.set(userData.email, userData.password);
 
     const newToken = generateRandomString(tokenLength);
