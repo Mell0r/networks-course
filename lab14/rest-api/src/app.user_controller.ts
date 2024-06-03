@@ -1,4 +1,10 @@
-import { Body, Controller, Get, HttpException } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Post,
+  HttpException,
+  HttpStatus,
+} from '@nestjs/common';
 import { SessionToken, UserData } from './user';
 
 const tokenLength = 40;
@@ -15,27 +21,53 @@ function generateRandomString(length: number): string {
 }
 
 let passwords = new Map<string, string>();
-let tokens = new Map<string, string>();
+export let tokens = new Map<string, string>();
 
-@Controller('/user')
+export function checkAuthorization(
+  token: string | undefined,
+): string | undefined {
+  if (!token) return undefined;
+  const user = Array.from(tokens).find(([tk, _]) => tk === token);
+  return user ? user[1] : undefined;
+}
+
+@Controller('user')
 export class UserController {
   constructor() {}
 
-  @Get('/sign-up')
+  @Post('sign-up')
   signUp(@Body() userData: UserData): SessionToken {
     if (passwords.has(userData.email)) {
-      throw new HttpException('User with this email already exisis');
+      throw new HttpException(
+        'User with this email already exisis',
+        HttpStatus.BAD_REQUEST,
+      );
     }
-    if (passwords.userData) passwords[userData.email] = userData.password;
-    const newToken = {
-      token: generateRandomString(tokenLength),
+    passwords.set(userData.email, userData.password);
+
+    const newToken = generateRandomString(tokenLength);
+    tokens.set(userData.email, newToken);
+    return {
+      token: newToken,
     };
-    tokens[userData.email] = newToken;
-    return newToken;
   }
 
-  @Get('/sign-in')
+  @Post('sign-in')
   getProduct(@Body() userData: UserData): SessionToken {
-    return product;
+    if (
+      !passwords.has(userData.email) ||
+      passwords.get(userData.email) !== userData.password
+    ) {
+      throw new HttpException(
+        'Account with this credentials does not exists',
+        HttpStatus.UNAUTHORIZED,
+      );
+    }
+
+    const newToken = generateRandomString(tokenLength);
+    tokens.set(userData.email, newToken);
+    return {
+      token: newToken,
+    };
   }
 }

@@ -10,23 +10,36 @@ import {
   Put,
 } from '@nestjs/common';
 import { Product, ProductData, createProduct } from './product';
+import { checkAuthorization } from './app.user_controller';
 
-let products: Product[] = [];
+let publicProducts: Product[] = [];
+let usersProducts = new Map<string, Product[]>();
 
 @Controller('/product')
 export class ProductController {
   constructor() {}
 
-  @Post('')
-  addProduct(@Body() productData: ProductData): Product {
+  @Post(':token?')
+  addProduct(
+    @Param('token') token: string | undefined,
+    @Body() productData: ProductData,
+  ): Product {
     const product = createProduct(productData);
-    products.push(product);
+    const maybeUser = checkAuthorization(token);
+    if (maybeUser) usersProducts[maybeUser].push(product);
+    else publicProducts.push(product);
     return product;
   }
 
-  @Get(':id')
-  getProduct(@Param('id') id: number): Product {
-    const product = products.find((value) => value.id == id);
+  @Get(':id/:token?')
+  getProduct(
+    @Param('id') id: number,
+    @Param('token') token: string | undefined,
+  ): Product {
+    const availableProducts = publicProducts.concat(
+      token ? usersProducts.get(token) ?? [] : [],
+    );
+    const product = availableProducts.find((value) => value.id == id);
     if (!product) {
       throw new HttpException(
         'Product with this id is not found',
@@ -36,13 +49,15 @@ export class ProductController {
     return product;
   }
 
-  @Put(':id')
+  @Put(':id/:token?')
   updateProduct(
     @Param('id') id: number,
+    @Param('token') token: string | undefined,
     @Body() newData: Partial<Product>,
   ): Product {
     let changedProduct: Product | undefined = undefined;
-    products = products.map((value) => {
+
+    publicProducts = publicProducts.map((value) => {
       if (value.id == id) {
         changedProduct = { ...value, ...newData };
         return changedProduct;
@@ -50,6 +65,22 @@ export class ProductController {
         return value;
       }
     });
+
+    const maybeUser = checkAuthorization(token);
+    if (maybeUser) {
+      if (!usersProducts.has(maybeUser)) {
+        usersProducts.set(maybeUser, []);
+      }
+      usersProducts.get(maybeUser)!!.map((value) => {
+        if (value.id == id) {
+          changedProduct = { ...value, ...newData };
+          return changedProduct;
+        } else {
+          return value;
+        }
+      });
+    }
+
     if (!changedProduct) {
       throw new HttpException(
         'Product with this id is not found',
@@ -59,10 +90,25 @@ export class ProductController {
     return changedProduct;
   }
 
-  @Delete(':id')
-  deleteProduct(@Param('id') id: number): Product {
-    const product = products.find((value) => value.id == id);
-    products = products.filter((value) => value.id == id);
+  @Delete(':id/:token?')
+  deleteProduct(
+    @Param('id') id: number,
+    @Param('token') token: string | undefined,
+  ): Product {
+    let product: Product | undefined = undefined;
+
+    product = publicProducts.find((value) => value.id == id);
+    publicProducts = publicProducts.filter((value) => value.id == id);
+
+    const maybeUser = checkAuthorization(token);
+    if (maybeUser && usersProducts.has(maybeUser)) {
+      product = usersProducts.get(maybeUser)!!.find((value) => value.id == id);
+      usersProducts.set(
+        maybeUser,
+        usersProducts.get(maybeUser)!!.filter((value) => value.id == id),
+      );
+    }
+
     if (!product) {
       throw new HttpException(
         'Product with this id is not found',
@@ -77,8 +123,8 @@ export class ProductController {
 export class ProductListController {
   constructor() {}
 
-  @Get('')
-  getList(): Product[] {
-    return products;
+  @Get(':token?')
+  getList(@Param('token') token: string | undefined): Product[] {
+    return publicProducts.concat(token ? usersProducts.get(token) ?? [] : []);
   }
 }
